@@ -1,3 +1,6 @@
+//Nome: João Lucas Cordeiro
+//GRR: 20190427
+
 #include <stdio.h>
 #include "queue.h"
 
@@ -108,7 +111,7 @@ int queue_remove (queue_t **queue, queue_t *elem){
 	else{
 		queue_t *aux = (*queue);
 		while (aux->next != (*queue)){
-			aux = aux->next;git add
+			aux = aux->next;
 			if (aux == elem){
 				//remove o elemento e retorna
 				elem->next->prev = elem->prev;
