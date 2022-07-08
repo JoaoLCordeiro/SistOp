@@ -20,10 +20,10 @@ task_t* current_task;
 task_t* main_task;
 int 	current_id	= 1;
 
-queue_t* fila_tasks;
-int		user_tasks;
+queue_t*	fila_tasks;
+int			user_tasks;
 
-task_t*	dispatcher_task;
+task_t	dispatcher_task;
 
 /////////////////////////////////////////////
 
@@ -55,15 +55,17 @@ void dispatcher(){
 
 				case (TERMINADA):
 					//retira a tarefa da fila de tarefas e dá free na estrutura
-					queue_remove ((queue_t **) fila_tasks, (queue_t *) prox_task);
+					queue_remove (&fila_tasks, (queue_t *) prox_task);
 
-					free (prox_task);
+					free (prox_task->context.uc_stack.ss_sp);
 					break;
 			}
 
 		}
 
 	}
+
+	task_exit(0);
 }
 
 void ppos_init (){
@@ -84,13 +86,13 @@ void ppos_init (){
 	//coloca 1 na current_id novamente só pra garantir
 	current_id = 1;
 
-	task_create(dispatcher_task, (void *) dispatcher, NULL);
+	task_create(&dispatcher_task, (void *) dispatcher, NULL);
 	user_tasks = 0;
 
 	//testa se a tarefa dispatcher foi criada
-	if (dispatcher_task == NULL){
+	/*if (dispatcher_task == NULL){
 		fprintf (stderr, "Erro no ppos_init: erro ao criar tarefa dispatcher\n");
-	}
+	}*/
 
 	#ifdef DEBUG
 	printf ("ppos_init: iniciou o ppos com o id da main: %d\n", main_task->id) ;
@@ -110,7 +112,7 @@ int task_create (task_t *task,
 	//testa se a funcao existe
 	if (start_func == NULL){
 		fprintf (stderr, "Erro na criacao de task: funcao inexistente\n");
-		return (-2);
+		return (-1);
 	}
 
 	//VERIFICAR MAIS COISAS
@@ -162,15 +164,16 @@ void task_exit (int exit_code){
 	#endif
 
 	//termina a task atual
-	current_task->id	= TERMINADA;
+	current_task->status	= TERMINADA;
 
 	if (current_task->id > 1){
 	//retorno para o dispatcher terminar a tarefa
-		task_switch (dispatcher_task);
+		user_tasks--;
+		task_switch (&dispatcher_task);
 	}
 	//quando a funcao a dar exit é o próprio dispatcher
 	else if (current_task->id == 1){
-
+		task_switch (main_task);
 	}
 }
 
@@ -213,5 +216,5 @@ int task_id (){
 
 void task_yield (){
 	//só isso? hmm
-	task_switch(dispatcher_task);
+	task_switch(&dispatcher_task);
 }
