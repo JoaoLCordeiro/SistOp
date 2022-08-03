@@ -5,14 +5,18 @@
 #include "queue.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
+#include <sys/time.h>
 
 //#define DEBUG
 
-//DEFINES STATUS/////////////////////////////
+//DEFINES ///////////////////////////////////
 
 #define PRONTA		0
 #define TERMINADA	1
 #define SUSPENSA	2
+
+#define QUANTUM		20
 
 /////////////////////////////////////////////
 
@@ -25,9 +29,61 @@ int 	current_id	= 1;
 queue_t*	fila_tasks;
 int			user_tasks;
 
+//guarda a tarefa do dispatcher
 task_t	dispatcher_task;
 
+//define um tratador de sinal
+struct sigaction action;
+
+//estrutura de inicialização to timer
+struct itimerval timer;
+
+//uma variavel que conta quantos quantum a tarefa atual está rodando
+int temporizador;
+
 /////////////////////////////////////////////
+
+void controla_tempo(){
+	if (current_task->preemptable == 1){
+		temporizador--;
+	}
+
+	if (temporizador == 0)
+		task_yield();
+}
+
+int inicia_timer_e_tratador(){
+	//o action vaidetectar interrupções do timer, sinal SIGALRM
+	action.sa_handler = controla_tempo; //task que sera chamada a cada milisegundo;
+	sigemptyset (&action.sa_mask);
+	action.sa_flags = 0 ;
+	if (sigaction (SIGALRM, &action, 0) < 0)
+	{
+		fprintf (stderr, "Erro no incia_timer_e_tratador: sigaction retornou erro\n");
+		return (-1) ;
+	}
+
+	//inicia os valores do timer
+	timer.it_value.tv_usec = 1000;		//primeiro disparo, em micro-segundos
+	timer.it_value.tv_sec  = 0;			//primeiro disparo, em segundos
+	timer.it_interval.tv_usec = 1000;	//disparos seguintes, em micro-segundos
+	timer.it_interval.tv_sec  = 0;		//disparos seguintes, em segundos	
+
+	// arma o temporizador ITIMER_REAL (vide man setitimer)
+	if (setitimer (ITIMER_REAL, &timer, 0) < 0)
+	{
+		fprintf (stderr, "Erro no incia_timer_e_tratador: setitimer retornou erro\n");
+		return(-2);
+	}
+
+	temporizador = QUANTUM;
+
+	#ifdef DEBUG
+	printf ("inicia_timer_e_tratador executou com sucesso\n");
+	#endif
+
+	return 0;
+}
 
 void task_setprio (task_t *task, int prio){
 	//testa se a prioridade é valida
@@ -98,11 +154,11 @@ void dispatcher(){
 		task_t* prox_task = scheduler();
 
 		if (prox_task != NULL){
+			temporizador = QUANTUM;
 			task_switch (prox_task);
 
 			switch (prox_task->status){
 				case (PRONTA):
-
 					break;
 
 				case (TERMINADA):
@@ -135,7 +191,9 @@ void ppos_init (){
 	main_task->id		= 0;
 	main_task->context	= main_context;
 	main_task->status	= PRONTA; 
-	//main_task->preemptable = 
+
+	//a main task é uma tarefa de usuário, logo, é preemptável
+	main_task->preemptable = 1;
 
 	current_task = main_task;
 
@@ -144,6 +202,12 @@ void ppos_init (){
 
 	task_create(&dispatcher_task, (void *) dispatcher, NULL);
 	user_tasks = 0;
+
+	//inicia o timer e o tratador do timer em uma funcao separada
+	if (inicia_timer_e_tratador() < 0){
+		fprintf (stderr, "Erro no ppos_init: incia_timer_e_tratador retornou erro\n");
+		exit(1);
+	}
 
 	#ifdef DEBUG
 	printf ("ppos_init: iniciou o ppos com o id da main: %d\n", main_task->id) ;
@@ -194,7 +258,12 @@ int task_create (task_t *task,
 	task->status		= PRONTA;
 	task->prio_e		= 0;
 	task->prio_d		= 0;
-	//task->preemptable	=
+	
+	//caso seja o dispatcher, ela nao é preemptável
+	if (task->id == 1)
+		task->preemptable	= 0;
+	else
+		task->preemptable	= 1;
 
 	current_id++;
 
