@@ -11,12 +11,14 @@
 //#define DEBUG
 //#define DEBUGSWITCH
 //#define DEBUGSCHEDULER
+#define DEBUGSLEEP
 
 //DEFINES ///////////////////////////////////
 
 #define PRONTA		0
 #define TERMINADA	1
 #define SUSPENSA	2
+#define ADORMECIDA	3
 
 #define QUANTUM		20
 
@@ -29,6 +31,7 @@ task_t	main_task;
 int 	current_id	= 0;
 
 queue_t*	fila_tasks_prontas;
+queue_t*	fila_tasks_dormindo;
 int			user_tasks;
 
 //guarda a tarefa do dispatcher
@@ -124,6 +127,71 @@ int task_getprio (task_t *task){
 	return (aux->prio_e);
 }
 
+void print_elem_fila (void* elem){
+	task_t* aux = (task_t *) elem;
+	printf ("%d", aux->id);
+}
+
+void imprime_tarefas_dormindo(){
+	queue_print ("Dormindo", fila_tasks_dormindo, print_elem_fila);
+}
+
+void acorda_tarefas(){
+	task_t* aux = (task_t *) fila_tasks_dormindo;
+
+	#ifdef DEBUGSLEEP2
+	imprime_tarefas_dormindo();
+	#endif
+
+	//se houverem elementos na fila
+	if (aux != NULL){
+		//caso hajam mais que uma dormindo
+		while(aux->next != (task_t *) fila_tasks_dormindo){
+			//vai acordando as tarefas
+			aux->tempo_dormir--;
+
+			#ifdef DEBUGSLEEP
+			printf ("acorda_tarefas: tarefa %d com tempo %d\n", aux->id, aux->tempo_dormir);
+			#endif
+
+			//acorda as tarefas
+			if (aux->tempo_dormir == 0){
+				#ifdef DEBUGSLEEP
+				printf ("acorda_tarefas: acordou a tarefa %d pois esta com tempo %d\n", aux->id, aux->tempo_dormir);
+				#endif
+
+				task_t* task_acorda = aux;
+				aux = aux->next;
+
+				task_acorda->status	= PRONTA;
+				queue_remove ((queue_t **) &fila_tasks_dormindo	, (queue_t *) task_acorda);
+				queue_append ((queue_t **) &fila_tasks_prontas	, (queue_t *) task_acorda);
+			}
+			else{
+				aux = aux->next;
+			}
+		}
+
+		//acordando a última task
+		aux->tempo_dormir--;
+
+		#ifdef DEBUGSLEEP
+		printf ("acorda_tarefas: tarefa %d com tempo %d\n", aux->id, aux->tempo_dormir);
+		#endif
+
+		//acordando a última task
+		if (aux->tempo_dormir == 0){
+			#ifdef DEBUGSLEEP
+			printf ("acorda_tarefas: acordou a tarefa %d pois esta com tempo %d\n", aux->id, aux->tempo_dormir);
+			#endif
+			task_t* task_acorda = aux;
+			task_acorda->status	= PRONTA;
+			queue_remove ((queue_t **) &fila_tasks_dormindo	, (queue_t *) task_acorda);
+			queue_append ((queue_t **) &fila_tasks_prontas	, (queue_t *) task_acorda);
+		}
+	}
+}
+
 task_t* scheduler(){
 	//se a fila nao possuir elementos
 	if (fila_tasks_prontas == NULL)
@@ -161,9 +229,9 @@ task_t* scheduler(){
 }
 
 void dispatcher(){
-
 	//enquanto tivermos tarefas na fila de tarefas
 	while (user_tasks > 0){
+		acorda_tarefas();
 		task_t* prox_task = scheduler();
 
 		if (prox_task != NULL){
@@ -218,6 +286,15 @@ void ppos_init (){
 	#ifdef DEBUG
 	printf ("ppos_init: iniciou o ppos com o id da main: %d\n", main_task.id) ;
 	#endif
+}
+
+void task_sleep (int t){
+	current_task->tempo_dormir	= t;
+	current_task->status		= ADORMECIDA;
+
+	queue_remove ((queue_t **) &fila_tasks_prontas	, (queue_t *) current_task);
+	queue_append ((queue_t **) &fila_tasks_dormindo	, (queue_t *) current_task);
+	task_yield();
 }
 
 int task_join (task_t *task){

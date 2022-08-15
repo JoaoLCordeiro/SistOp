@@ -28,6 +28,7 @@ typedef struct task_t
   int			ativacoes;      //numero de ativacoes
   struct task_t	*fila_espera;	//fila de tarefas que esperam essa terminar
   int			codigo_saida;	//guarda o codigo de saida da tarefa que foi esperada
+  int			tempo_dormir;	//guarda o tempo que a tarefa irá dormir ao chamar task_sleep
    // ... (outros campos serão adicionados mais tarde)
 } task_t ;
 
