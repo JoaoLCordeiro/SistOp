@@ -127,15 +127,6 @@ int task_getprio (task_t *task){
 	return (aux->prio_e);
 }
 
-void print_elem_fila (void* elem){
-	task_t* aux = (task_t *) elem;
-	printf ("%d", aux->id);
-}
-
-void imprime_tarefas_dormindo(){
-	queue_print ("Dormindo", fila_tasks_dormindo, print_elem_fila);
-}
-
 void acorda_tarefas(){
 	task_t* aux = (task_t *) fila_tasks_dormindo;
 
@@ -262,27 +253,30 @@ void ppos_init (){
 }
 
 void task_sleep (int t){
+	#ifdef DEBUG
+	printf ("task_sleep: a task %d quer mimir %d milisegundos\n", current_task->id, current_task->tempo_dormir);
+	#endif
+
 	if (t <= 0){
 		task_yield();
 		return;
 	}
 
+	//coloca os valores na tarefa atual
 	current_task->tempo_dormir	= t;
 	current_task->ini_sono		= systime();
 	current_task->status		= ADORMECIDA;
 
+	//remove da fila de prontas e coloca na fila de tarefas dormindo
 	queue_remove ((queue_t **) &fila_tasks_prontas	, (queue_t *) current_task);
 	queue_append ((queue_t **) &fila_tasks_dormindo	, (queue_t *) current_task);
-
-	#ifdef DEBUGSLEEP
-	imprime_tarefas_dormindo();
-	#endif
 
 	task_yield();
 }
 
 int task_join (task_t *task){
 
+	//testa erros
 	if (task == NULL)	
 		return (-1);
 	else if (task->status == TERMINADA)
@@ -300,18 +294,16 @@ int task_join (task_t *task){
 }
 
 void task_suspend (task_t **queue){
+	//remove das prontas
 	queue_remove ((queue_t **) &fila_tasks_prontas, (queue_t *) current_task);
-
-	#ifdef DEBUG
-	printf ("task_suspend: a task %d foi removida da fila de prontas\n", current_task->id);
-	#endif
 
 	current_task->status	= SUSPENSA;
 
+	//coloca na fila desejada
 	queue_append ((queue_t **) queue, (queue_t *) current_task);
 
 	#ifdef DEBUG
-	printf ("task_suspend: a task %d foi colocada na fila desejada\n", current_task->id);
+	printf ("task_suspend: a task %d foi removida da fila de prontas e foi colocada na fila desejada\n", current_task->id);
 	#endif
 
 	task_yield();
@@ -321,11 +313,17 @@ void task_resume (task_t * task, task_t **queue){
 	if (queue == NULL)
 		return;
 
+	//remove da fila requerida
 	queue_remove ((queue_t **) queue, (queue_t *) task);
 
 	task->status	= PRONTA;
 
+	//coloca na fila de prontas
 	queue_append ((queue_t **) &fila_tasks_prontas, (queue_t *) task);
+
+	#ifdef DEBUG
+	printf ("task_resume: a task %d foi removida da fila desejada e foi colocada na fila de prontas\n", task->id);
+	#endif
 }
 
 int task_create (task_t *task,
@@ -411,6 +409,7 @@ void task_exit (int exit_code){
 	printf("Task %d exit: execution time %d ms, processor time %d, %d activations\n", 
 	current_task->id, current_task->tempo_exec, current_task->tempo_process, current_task->ativacoes);
 
+	//exit_code para o task_join das tarefas retornarem
 	current_task->codigo_saida = exit_code;
 
 	//enquanto existirem elementos na fila
