@@ -11,7 +11,7 @@
 //#define DEBUG
 //#define DEBUGSWITCH
 //#define DEBUGSCHEDULER
-#define DEBUGSLEEP
+//#define DEBUGSLEEP
 
 //DEFINES ///////////////////////////////////
 
@@ -139,56 +139,29 @@ void imprime_tarefas_dormindo(){
 void acorda_tarefas(){
 	task_t* aux = (task_t *) fila_tasks_dormindo;
 
-	#ifdef DEBUGSLEEP2
-	imprime_tarefas_dormindo();
-	#endif
-
 	//se houverem elementos na fila
 	if (aux != NULL){
 		//caso hajam mais que uma dormindo
-		while(aux->next != (task_t *) fila_tasks_dormindo){
-			//vai acordando as tarefas
-			aux->tempo_dormir--;
-
-			#ifdef DEBUGSLEEP
-			printf ("acorda_tarefas: tarefa %d com tempo %d\n", aux->id, aux->tempo_dormir);
-			#endif
-
-			//acorda as tarefas
-			if (aux->tempo_dormir == 0){
-				#ifdef DEBUGSLEEP
-				printf ("acorda_tarefas: acordou a tarefa %d pois esta com tempo %d\n", aux->id, aux->tempo_dormir);
-				#endif
-
-				task_t* task_acorda = aux;
+		while((aux->next != (task_t *) fila_tasks_dormindo) && (fila_tasks_dormindo != NULL)){
+			if (aux->ini_sono + aux->tempo_dormir == systime()){
+				task_t* tarefa_remov = aux;
 				aux = aux->next;
 
-				task_acorda->status	= PRONTA;
-				queue_remove ((queue_t **) &fila_tasks_dormindo	, (queue_t *) task_acorda);
-				queue_append ((queue_t **) &fila_tasks_prontas	, (queue_t *) task_acorda);
+				task_resume(tarefa_remov, (task_t **) &fila_tasks_dormindo);
 			}
-			else{
+			else
 				aux = aux->next;
-			}
 		}
 
-		//acordando a última task
-		aux->tempo_dormir--;
+		//caso fique só uma
+		if (aux->ini_sono + aux->tempo_dormir == systime()){
+			task_t* tarefa_remov = aux;
+			aux = aux->next;
 
-		#ifdef DEBUGSLEEP
-		printf ("acorda_tarefas: tarefa %d com tempo %d\n", aux->id, aux->tempo_dormir);
-		#endif
-
-		//acordando a última task
-		if (aux->tempo_dormir == 0){
-			#ifdef DEBUGSLEEP
-			printf ("acorda_tarefas: acordou a tarefa %d pois esta com tempo %d\n", aux->id, aux->tempo_dormir);
-			#endif
-			task_t* task_acorda = aux;
-			task_acorda->status	= PRONTA;
-			queue_remove ((queue_t **) &fila_tasks_dormindo	, (queue_t *) task_acorda);
-			queue_append ((queue_t **) &fila_tasks_prontas	, (queue_t *) task_acorda);
+			task_resume(tarefa_remov, (task_t **) &fila_tasks_dormindo);
 		}
+		else
+			aux = aux->next;
 	}
 }
 
@@ -289,11 +262,22 @@ void ppos_init (){
 }
 
 void task_sleep (int t){
+	if (t <= 0){
+		task_yield();
+		return;
+	}
+
 	current_task->tempo_dormir	= t;
+	current_task->ini_sono		= systime();
 	current_task->status		= ADORMECIDA;
 
 	queue_remove ((queue_t **) &fila_tasks_prontas	, (queue_t *) current_task);
 	queue_append ((queue_t **) &fila_tasks_dormindo	, (queue_t *) current_task);
+
+	#ifdef DEBUGSLEEP
+	imprime_tarefas_dormindo();
+	#endif
+
 	task_yield();
 }
 
@@ -426,11 +410,6 @@ void task_exit (int exit_code){
 
 	printf("Task %d exit: execution time %d ms, processor time %d, %d activations\n", 
 	current_task->id, current_task->tempo_exec, current_task->tempo_process, current_task->ativacoes);
-
-	#ifdef DEBUG
-	printf ("task_exit: a task %d quer tirar elementos de sua fila de espera %d\n", 
-			current_task->id, current_task->fila_espera);
-	#endif
 
 	current_task->codigo_saida = exit_code;
 
