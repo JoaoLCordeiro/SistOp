@@ -102,6 +102,8 @@ int sem_down (semaphore_t *s){
 
 		task_yield();
 	}
+	else
+		current_task->preemptable = 1;
 
 	#ifdef DEBUGSEMAPHORE
 	printf ("sem_down: a tarefa %d passou pelo if\n", current_task->id);
