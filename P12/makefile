@@ -1,13 +1,13 @@
 CFLAGS = -Wall
-OBJS = pingpong-prodcons.o ppos_core.o queue.o
+OBJS = pingpong-mqueue.o ppos_core.o queue.o
 
-all: prodcons
+all: mqueue
 
-prodcons: $(OBJS)
-	gcc -o pingpong-prodcons $(CFLAGS) $(OBJS)
+mqueue: $(OBJS)
+	gcc -o pingpong-mqueue $(CFLAGS) $(OBJS)
 
-pingpong-prodcons.o: pingpong-prodcons.c
-	gcc $(CFLAGS) -c pingpong-prodcons.c
+pingpong-mqueue.o: pingpong-mqueue.c
+	gcc $(CFLAGS) -c pingpong-mqueue.c -lm
 
 queue.o: queue.c
 	gcc $(CFLAGS) -c queue.c
