@@ -1,20 +1,13 @@
 CFLAGS = -Wall
-OBJSR = pingpong-racecond.o ppos_core.o queue.o
-OBJSS = pingpong-semaphore.o ppos_core.o queue.o
+OBJS = pingpong-prodcons.o ppos_core.o queue.o
 
-all: racecond semaphore
+all: prodcons
 
-racecond: $(OBJSR)
-	gcc -o pingpong-racecond $(CFLAGS) $(OBJSR)
+prodcons: $(OBJS)
+	gcc -o pingpong-prodcons $(CFLAGS) $(OBJS)
 
-semaphore: $(OBJSS)
-	gcc -o pingpong-semaphore $(CFLAGS) $(OBJSS)
-
-pingpong-racecond.o: pingpong-racecond.c
-	gcc $(CFLAGS) -c pingpong-racecond.c
-
-pingpong-semaphore.o: pingpong-semaphore.c
-	gcc $(CFLAGS) -c pingpong-semaphore.c
+pingpong-prodcons.o: pingpong-prodcons.c
+	gcc $(CFLAGS) -c pingpong-prodcons.c
 
 queue.o: queue.c
 	gcc $(CFLAGS) -c queue.c

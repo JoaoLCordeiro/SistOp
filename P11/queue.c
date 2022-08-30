@@ -45,7 +45,7 @@ int queue_append (queue_t **queue, queue_t *elem){
 
 	//verifica se o elemento existe
 	if (elem == NULL){
-		fprintf(stderr, "Erro: elemento inexistente\n");
+		fprintf(stderr, "queue_append - erro: elemento inexistente\n");
 		return (-2);
 	}
 
@@ -82,7 +82,7 @@ int queue_remove (queue_t **queue, queue_t *elem){
 
 	//verifica se o elemento existe
 	if (elem == NULL){
-		fprintf(stderr, "Erro: elemento inexistente\n");
+		fprintf(stderr, "queue_remove - erro: elemento inexistente\n");
 		return (-2);
 	}
 
