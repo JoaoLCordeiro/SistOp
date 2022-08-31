@@ -15,6 +15,7 @@
 //#define DEBUGSCHEDULER
 //#define DEBUGSLEEP
 //#define DEBUGSEMAPHORE
+//#define DEBUGMSGQUEUE
 
 //DEFINES ///////////////////////////////////
 
@@ -55,6 +56,10 @@ int tempo_sistema = 0;
 /*-----------FILA-DE-MENSAGENS-------------*/
 
 int mqueue_create (mqueue_t *queue, int max_msgs, int msg_size){
+	#ifdef DEBUGMSGQUEUE
+	printf ("mqueue_create: entrou na função\n");
+	#endif
+
 	if (queue == NULL){
 		perror ("mqueue_create:	ponteiro nulo para mqueue");
 		return -1;
@@ -66,6 +71,7 @@ int mqueue_create (mqueue_t *queue, int max_msgs, int msg_size){
 	queue->tam_mensagem	= msg_size;
 	//a cabeca sempre comeca na primeira posicao do buffer
 	queue->cabeca		= queue->buffer;
+	queue->cauda		= queue->buffer;
 
 	//comeca com todas as vagas livres
 	if (sem_create(&(queue->vagas), max_msgs)){
@@ -74,7 +80,7 @@ int mqueue_create (mqueue_t *queue, int max_msgs, int msg_size){
 	}
 
 	//comeca 0 itens
-	if (sem_create(&(queue->vagas), 0)){
+	if (sem_create(&(queue->itens), 0)){
 		perror ("mqueue_create:	nao conseguiu criar o semáforo dos itens");
 		return -1;
 	}
@@ -88,6 +94,10 @@ int mqueue_create (mqueue_t *queue, int max_msgs, int msg_size){
 }
 
 int mqueue_send (mqueue_t *queue, void *msg){
+	#ifdef DEBUGMSGQUEUE
+	printf ("mqueue_send: entrou na função\n");
+	#endif
+
 	if (queue == NULL){
 		perror ("mqueue_send:	ponteiro nulo para a queue\n");
 		return -1;
@@ -98,10 +108,12 @@ int mqueue_send (mqueue_t *queue, void *msg){
 		return -1;
 	}
 
-	sem_down(&(queue->vagas));
+	if (sem_down(&(queue->vagas)) == -1)
+		return -1;
 
 	//verifica se o buffer está em uso e bloqueia se estiver
-	sem_down(&(queue->semaforo));
+	if (sem_down(&(queue->semaforo)) == -1)
+		return -1;
 
 	memcpy(queue->cabeca, msg, queue->tam_mensagem);
 
@@ -111,14 +123,21 @@ int mqueue_send (mqueue_t *queue, void *msg){
 		queue->cabeca = queue->buffer;
 	}
 
-	sem_up(&(queue->semaforo));
+	if (sem_up(&(queue->semaforo)) == -1)
+		return -1;
 
-	sem_up(&(queue->itens));
+	if (sem_up(&(queue->itens)) == -1)
+		return -1;
 
 	return 0;
 }
 
 int mqueue_recv (mqueue_t *queue, void *msg){
+	#ifdef DEBUGMSGQUEUE
+	printf ("mqueue_recv: entrou na função\n");
+	#endif
+
+
 	if (queue == NULL){
 		perror ("mqueue_recv:	ponteiro nulo para a queue\n");
 		return -1;
@@ -129,28 +148,35 @@ int mqueue_recv (mqueue_t *queue, void *msg){
 		return -1;
 	}
 
-	sem_down (&(queue->itens));
+	if (sem_down (&(queue->itens)) == -1)
+		return -1;
 
 	//verifica se o buffer está em uso e bloqueia se estiver
-	sem_down(&(queue->semaforo));
+	if (sem_down(&(queue->semaforo)) == -1)
+		return -1;
 
-	memcpy(msg, queue->cabeca, queue->tam_mensagem);
+	memcpy(msg, queue->cauda, queue->tam_mensagem);
 
+	queue->cauda += queue->tam_mensagem;
 	//faz o buffer circular
-	if (queue->buffer == queue->cabeca){
-		queue->cabeca = queue->buffer + (queue->tam_mensagem * (queue->vagas_max - 1));
+	if (queue->buffer + queue->tam_mensagem * queue->vagas_max == queue->cauda){
+		queue->cauda = queue->buffer;
 	}
-	else
-		queue->cabeca -= queue->tam_mensagem;
 
-	sem_up(&(queue->semaforo));
+	if (sem_up(&(queue->semaforo)) == -1)
+		return -1;
 
-	sem_up(&(queue->vagas));
+	if (sem_up(&(queue->vagas)) == -1)
+		return -1;
 
 	return 0;
 }
 
 int mqueue_destroy (mqueue_t *queue){
+	#ifdef DEBUGMSGQUEUE
+	printf ("mqueue_destroy: entrou na função\n");
+	#endif
+
 	if (queue == NULL){
 		perror ("mqueue_destroy:	ponteiro nulo para a queue\n");
 		return -1;
@@ -165,6 +191,10 @@ int mqueue_destroy (mqueue_t *queue){
 }
 
 int mqueue_msgs (mqueue_t *queue){
+	#ifdef DEBUGMSGQUEUE
+	printf ("mqueue_msgs: entrou na função\n");
+	#endif
+
 	if (queue == NULL){
 		perror ("mqueue_msgs:	ponteiro nulo para a queue");
 		return -1;

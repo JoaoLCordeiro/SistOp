@@ -4,7 +4,7 @@ OBJS = pingpong-mqueue.o ppos_core.o queue.o
 all: mqueue
 
 mqueue: $(OBJS)
-	gcc -o pingpong-mqueue $(CFLAGS) $(OBJS)
+	gcc -o pingpong-mqueue $(CFLAGS) $(OBJS) -lm
 
 pingpong-mqueue.o: pingpong-mqueue.c
 	gcc $(CFLAGS) -c pingpong-mqueue.c -lm

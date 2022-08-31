@@ -63,6 +63,7 @@ typedef struct
 	semaphore_t	itens;
 	int		tam_mensagem;
 	void*	cabeca;
+  void* cauda;
 	semaphore_t	semaforo;
 	// preencher quando necessário
 } mqueue_t ;
