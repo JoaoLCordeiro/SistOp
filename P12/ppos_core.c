@@ -65,6 +65,8 @@ int mqueue_create (mqueue_t *queue, int max_msgs, int msg_size){
 		return -1;
 	}
 
+	//inicializa as variáveis
+
 	queue->buffer = malloc (max_msgs*msg_size);
 
 	queue->vagas_max	= max_msgs;
@@ -85,6 +87,7 @@ int mqueue_create (mqueue_t *queue, int max_msgs, int msg_size){
 		return -1;
 	}
 
+	//semaforo para entrar na msg queue
 	if (sem_create(&(queue->semaforo), 1)){
 		perror ("mqueue_create:	nao conseguiu criar o semáforo");
 		return -1;
@@ -98,6 +101,7 @@ int mqueue_send (mqueue_t *queue, void *msg){
 	printf ("mqueue_send: entrou na função\n");
 	#endif
 
+	//verifica ponteiros
 	if (queue == NULL){
 		perror ("mqueue_send:	ponteiro nulo para a queue\n");
 		return -1;
@@ -108,6 +112,7 @@ int mqueue_send (mqueue_t *queue, void *msg){
 		return -1;
 	}
 
+	//testa os sem_down e sem_up para retornar -1 quando forem destruídos
 	if (sem_down(&(queue->vagas)) == -1)
 		return -1;
 
@@ -137,7 +142,7 @@ int mqueue_recv (mqueue_t *queue, void *msg){
 	printf ("mqueue_recv: entrou na função\n");
 	#endif
 
-
+	//verifica ponteiros
 	if (queue == NULL){
 		perror ("mqueue_recv:	ponteiro nulo para a queue\n");
 		return -1;
@@ -148,6 +153,7 @@ int mqueue_recv (mqueue_t *queue, void *msg){
 		return -1;
 	}
 
+	//testa os sem_down e sem_up para retornar -1 quando forem destruídos
 	if (sem_down (&(queue->itens)) == -1)
 		return -1;
 
@@ -177,12 +183,16 @@ int mqueue_destroy (mqueue_t *queue){
 	printf ("mqueue_destroy: entrou na função\n");
 	#endif
 
+	//testa o ponteiro
 	if (queue == NULL){
 		perror ("mqueue_destroy:	ponteiro nulo para a queue\n");
 		return -1;
 	}
 
+	//dá free no malloc
 	free(queue->buffer);
+
+	//destrói os semáforos
 	sem_destroy(&(queue->itens));
 	sem_destroy(&(queue->vagas));
 	sem_destroy(&(queue->semaforo));
@@ -195,11 +205,13 @@ int mqueue_msgs (mqueue_t *queue){
 	printf ("mqueue_msgs: entrou na função\n");
 	#endif
 
+	//testa ponteiro
 	if (queue == NULL){
 		perror ("mqueue_msgs:	ponteiro nulo para a queue");
 		return -1;
 	}
 
+	//pega o valor do count do semáforo de itens, se for menor que zero, não tem item na fila também
 	int msgs = sem_count (&(queue->itens));
 	if (msgs < 0)
 		msgs = 0;
@@ -217,6 +229,7 @@ int sem_count (semaphore_t *s){
 		return -1;
 	}
 
+	//retorna o contador do semáforo
 	return s->contador;
 }
 
