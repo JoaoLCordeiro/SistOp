@@ -22,14 +22,6 @@
 #define 	READ	1
 #define		WRITE	2
 
-semaphore_t sem_disk;	//semáforo do disco
-
-struct sigaction disk_action;	//ação do disco pra quando receber sinal
-
-int sinal_disk;			//sinal do disco
-
-task_t ddriver_task;	//task do driver
-
 //estrutura de um pedido
 typedef struct pedido_t{
 	task_t *prev, *next;//usado na fila de pedidos
@@ -38,6 +30,16 @@ typedef struct pedido_t{
 	int		block;		//bloco interessado
 	void   *buffer;		//buffer do pedido
 } pedido_t;
+
+semaphore_t sem_disk;	//semáforo do disco
+
+struct sigaction disk_action;	//ação do disco pra quando receber sinal
+
+int sinal_disk;			//sinal do disco
+
+task_t ddriver_task;	//task do driver
+
+queue_t* pedidos_prontos;
 
 // inicializacao do gerente de disco
 // retorna -1 em erro ou 0 em sucesso
