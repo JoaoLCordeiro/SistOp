@@ -1,6 +1,51 @@
 #ifndef __PPOSCORE__
 #define __PPOSCORE__
 
+#include "ppos.h"
+#include "queue.h"
+#include "disk.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <sys/time.h>
+#include <string.h>
+
+//DEFINES ///////////////////////////////////
+
+#define PRONTA		0
+#define TERMINADA	1
+#define SUSPENSA	2
+#define ADORMECIDA	3
+
+#define QUANTUM		20
+
+/////////////////////////////////////////////
+
+//VARIÁVEIS GLOBAIS//////////////////////////
+
+task_t* current_task;
+task_t	main_task;
+int 	current_id;
+
+queue_t*	fila_tasks_prontas;
+queue_t*	fila_tasks_dormindo;
+int			user_tasks;
+
+//guarda a tarefa do dispatcher
+task_t	dispatcher_task;
+
+//define um tratador de sinal
+struct sigaction action;
+
+//estrutura de inicialização to timer
+struct itimerval timer;
+
+//variáveis que controlam tempo
+int temporizador;
+int tempo_sistema;
+
+/////////////////////////////////////////////
+
 int mqueue_create (mqueue_t *queue, int max_msgs, int msg_size);
 
 int mqueue_send (mqueue_t *queue, void *msg);

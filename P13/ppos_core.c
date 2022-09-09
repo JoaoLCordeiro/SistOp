@@ -1,14 +1,6 @@
 //Nome: João Lucas Cordeiro			GRR:20190427
 
-#include "ppos.h"
-#include "ppos_data.h"
-#include "queue.h"
 #include "ppos_core.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <sys/time.h>
-#include <string.h>
 
 //#define DEBUG
 //#define DEBUGSWITCH
@@ -16,42 +8,6 @@
 //#define DEBUGSLEEP
 //#define DEBUGSEMAPHORE
 //#define DEBUGMSGQUEUE
-
-//DEFINES ///////////////////////////////////
-
-#define PRONTA		0
-#define TERMINADA	1
-#define SUSPENSA	2
-#define ADORMECIDA	3
-
-#define QUANTUM		20
-
-/////////////////////////////////////////////
-
-//VARIÁVEIS GLOBAIS//////////////////////////
-
-task_t* current_task;
-task_t	main_task;
-int 	current_id	= 0;
-
-queue_t*	fila_tasks_prontas;
-queue_t*	fila_tasks_dormindo;
-int			user_tasks;
-
-//guarda a tarefa do dispatcher
-task_t	dispatcher_task;
-
-//define um tratador de sinal
-struct sigaction action;
-
-//estrutura de inicialização to timer
-struct itimerval timer;
-
-//variáveis que controlam tempo
-int temporizador;
-int tempo_sistema = 0;
-
-/////////////////////////////////////////////
 
 /*-----------FILA-DE-MENSAGENS-------------*/
 
@@ -549,6 +505,8 @@ void ppos_init (){
 
 	//coloca 0 na current_id novamente só pra garantir
 	current_id = 0;
+
+	tempo_sistema = 0;
 	
 	user_tasks = 0;
 	task_create(&main_task, NULL, NULL);

@@ -1,13 +1,23 @@
 CFLAGS = -Wall
-OBJS = pingpong-mqueue.o ppos_core.o queue.o
+OBJS1 = pingpong-disco1.o ppos_core.o queue.o disk.o ppos_disk.o
+OBJS2 = pingpong-disco2.o ppos_core.o queue.o disk.o ppos_disk.o
 
-all: mqueue
+all: disco1 disco2
 
-mqueue: $(OBJS)
-	gcc -o pingpong-mqueue $(CFLAGS) $(OBJS) -lm
+disco1: $(OBJS1)
+	gcc -o pingpong-disco1 $(CFLAGS) $(OBJS1) -lrt
+
+disco2: $(OBJS2)
+	gcc -o pingpong-disco1 $(CFLAGS) $(OBJS2) -lrt
+
+pingpong-disco1.o: pingpong-disco1.c
+	gcc $(CFLAGS) -c pingpong-disco1.c
+
+pingpong-disco2.o: pingpong-disco2.c
+	gcc $(CFLAGS) -c pingpong-disco2.c
 
 pingpong-mqueue.o: pingpong-mqueue.c
-	gcc $(CFLAGS) -c pingpong-mqueue.c -lm
+	gcc $(CFLAGS) -c pingpong-mqueue.c
 
 queue.o: queue.c
 	gcc $(CFLAGS) -c queue.c
@@ -15,8 +25,11 @@ queue.o: queue.c
 ppos_core.o: ppos_core.c
 	gcc $(CFLAGS) -c ppos_core.c
 
-pingpong-sleep.o: pingpong-sleep.c
-	gcc $(CFLAGS) -c pingpong-sleep.c
+disk.o: disk.c
+	gcc $(CFLAGS) -c disk.c -lrt
+
+ppos_disk.o: ppos_disk.c
+	gcc $(CFLAGS) -c ppos_disk.c
 
 clean:
 	-rm -f *~ *.o
