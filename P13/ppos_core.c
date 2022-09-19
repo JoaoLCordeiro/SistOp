@@ -463,9 +463,11 @@ task_t* scheduler(){
 
 void dispatcher(){
 	//enquanto tivermos tarefas na fila de tarefas
-	while (user_tasks > 0){
+	while (user_tasks > 1){
 		acorda_tarefas();
 		task_t* prox_task = scheduler();
+
+		//printf("dispatcher: laço do dispatcher\n");
 
 		if (prox_task != NULL){
 

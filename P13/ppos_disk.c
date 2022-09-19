@@ -1,219 +1,209 @@
 #include "ppos_disk.h"
 
-//#define DEBUGDISK
-
-void disk_handler(){
-	#ifdef DEBUGDISK
-	printf ("disk_handler: entrou na função\n");
+void trataSigUsr (){
+	#ifdef DEBUGPPOSDISK
+	printf ("trataSigUsr: entrou na função\n");
 	#endif
 
-	sinal_disk = 1;
-	
-	if (ddriver_task.status == SUSPENSA){
-		task_resume (&ddriver_task, (task_t **) &fila_tasks_prontas);
+	sinal_disco = 1;
+
+	queue_append ((queue_t **) &fila_tasks_prontas, (queue_t *) &task_driver);
+	task_yield();
+}
+
+void diskDriverBody (){
+	#ifdef DEBUGPPOSDISK
+	printf ("diskDriverBody: entrou na função\n");
+	#endif
+
+	while (1) 
+	{
+		#ifdef DEBUGPPOSDISK
+		printf ("diskDriverBody: começou o laço\n");
+		#endif
+
+		// obtém o semáforo de acesso ao disco
+		sem_down(&sem_disk);	
+
+		// se foi acordado devido a um sinal do disco
+		if (sinal_disco == 1)
+		{
+			#ifdef DEBUGPPOSDISK
+			printf ("diskDriverBody: entrou no sinal_disco == 1\n");
+			#endif
+
+			// acorda a tarefa cujo pedido foi atendido
+			pedido_t* pedido = pedidos_queue;
+			queue_remove ((queue_t **) &pedidos_queue, (queue_t *) pedido);
+			queue_append ((queue_t **) &fila_tasks_prontas, (queue_t *) pedido->task);
+
+			sinal_disco = 0;
+		}
+
+		// se o disco estiver livre e houver pedidos de E/S na fila
+		if ((disk_cmd (DISK_CMD_STATUS, 0, NULL) == DISK_STATUS_IDLE) && (pedidos_queue != NULL))
+		{
+			#ifdef DEBUGPPOSDISK
+			printf ("diskDriverBody: entrou no segundo if\n");
+			#endif
+
+			// escolhe na fila o pedido a ser atendido, usando FCFS
+			// solicita ao disco a operação de E/S, usando disk_cmd()
+			int		block	= pedidos_queue->block;
+			void*	buffer	= pedidos_queue->buffer;
+			int		tipo	= pedidos_queue->tipo;
+
+			if (tipo == READ){
+				#ifdef DEBUGPPOSDISK
+				printf ("diskDriverBody: entrou no tipo == READ\n");
+				#endif
+
+				if (disk_cmd (DISK_CMD_READ, block, buffer) == -1){
+					perror ("diskDriverBody: Erro no disk_cmd com read\n");
+					exit(1);
+				}
+			}
+			else if (tipo == WRITE){
+				#ifdef DEBUGPPOSDISK
+				printf ("diskDriverBody: entrou no tipo == WRITE\n");
+				#endif
+
+				if (disk_cmd (DISK_CMD_WRITE, block, buffer) == -1){
+					perror ("diskDriverBody: Erro no disk_cmd com write\n");
+					exit(1);
+				}
+			}
+			else{
+				#ifdef DEBUGPPOSDISK
+				printf ("diskDriverBody: tipo inesperado\n");
+				#endif
+			}
+		}	
+		// libera o semáforo de acesso ao disco
+		sem_up(&sem_disk);
+		// suspende a tarefa corrente (retorna ao dispatcher)
+		#ifdef DEBUGPPOSDISK
+		printf ("diskDriverBody: deu yield\n");
+		#endif
+		queue_remove ((queue_t **) &fila_tasks_prontas, (queue_t *) &task_driver);
+		task_yield();
 	}
 }
 
-void disk_driver(){
-	#ifdef DEBUGDISK
-	printf ("disk_driver: entrou na função\n");
-	#endif
-
-	int conta_lacos = 1;
-
-	while (1){
-		//#ifdef DEBUGDISK
-		//printf ("disk_driver: laço numero %d\n", conta_lacos);
-		//#endif
-
-		conta_lacos++;
-
-		//prende o semáforo
-		sem_down(&sem_disk);
-
-		//detectar sinal
-		if (sinal_disk == 1){
-			#ifdef DEBUGDISK
-			printf ("disk_driver: (pedido_pronto)\n");
-			#endif
-
-			pedido_t *pedido_pronto = (pedido_t *) pedidos_prontos;
-
-			if (queue_remove ((queue_t **) &(pedidos_prontos), (queue_t *) pedido_pronto) < 0){
-				perror ("disk_driver: erro no queue_remove do pronto");
-				return;
-			}
-
-			task_resume (pedido_pronto->tarefa, (task_t **) &pedido_pronto->tarefa);
-
-			sinal_disk = 0;
-		}
-
-		if ((disk_cmd(DISK_CMD_STATUS, 0, NULL) == DISK_STATUS_IDLE) && (sem_disk.fila_tasks != NULL)){
-
-			pedido_t *pedido_atual = (pedido_t *) sem_disk.fila_tasks;
-
-			#ifdef DEBUGDISK
-			printf ("disk_driver: (pedido_atual) do tipo %s\n", (pedido_atual->tipo == READ ? "READ" : "WRITE"));
-			#endif
-
-			if (queue_remove ((queue_t **) &(sem_disk.fila_tasks), (queue_t *) pedido_atual) < 0){
-				perror ("disk_driver: erro no queue_remove do atual");
-				return;
-			}
-
-			if (queue_append (&(pedidos_prontos), (queue_t *) pedido_atual) < 0){
-				perror ("disk_driver: erro no queue_append do atual");
-				return;
-			}
-
-			if (pedido_atual->tipo == READ){
-
-				if (disk_cmd (DISK_CMD_READ, pedido_atual->block, pedido_atual->buffer)){
-					perror ("disk_driver: Erro ao ler do arquivo\n");
-					return;
-				}
-
-			}
-			else if (pedido_atual->tipo == WRITE){
-
-				if (disk_cmd (DISK_CMD_WRITE, pedido_atual->block, pedido_atual->buffer)){
-					perror ("disk_driver: Erro ao escrever no arquivo\n");
-					return;
-				}
-
-			}
-		}
-
-		//libera o semáforo
-		sem_up(&sem_disk);
-
-		//retorna pro dispatcher
-		task_yield();
-	}
-} 
-
 int disk_mgr_init (int *numBlocks, int *blockSize){
-	#ifdef DEBUGDISK
+	#ifdef DEBUGPPOSDISK
 	printf ("disk_mgr_init: entrou na função\n");
 	#endif
 
-	//cria um semáforo de 1 para o disco
+	sinal_disco = 0;
+
+	//cria o semáforo do disco
 	sem_create (&sem_disk, 1);
+	//pedidos_queue = malloc (sizeof(pedido_t));
+	
+	//task que sera chamada a cada sinal
+	action_disk.sa_handler = trataSigUsr; 
+	sigemptyset (&action_disk.sa_mask);
+	action_disk.sa_flags = 0 ;
 
-	disk_action.sa_handler = disk_handler;
-  	sigemptyset (&disk_action.sa_mask);
-  	disk_action.sa_flags = 0;
+	if (sigaction (SIGUSR1, &action_disk, 0) < 0)
+	{
+		fprintf (stderr, "Erro no disk_mgr_init: sigaction retornou erro\n");
+		return (-1) ;
+	}
 
-	if (sigaction (SIGUSR1, &disk_action, 0) < 0){
-		perror ("disk_mgr_init: sigaction retornou erro\n");
+	//inicia o disco
+	if (disk_cmd (DISK_CMD_INIT, 0, NULL) == -1){
+		perror("disk_mgr_init: Erro no disk_init\n");
 		return -1;
 	}
 
-	if (disk_cmd (DISK_CMD_INIT, 0, NULL)){
-		perror ("disk_mgr_init: Erro ao iniciar o disco (DISK_CMD_INIT)\n");
+	//guarda o número de blocos do disco em numBlocks
+	*numBlocks = disk_cmd (DISK_CMD_DISKSIZE, 0, NULL);
+	if ((*numBlocks) == -1){
+		perror("disk_mgr_init: Erro no disk_size\n");
 		return -1;
 	}
 
-	*numBlocks	=	disk_cmd (DISK_CMD_DISKSIZE, 0, NULL);
-	if (*numBlocks == -1){
-		perror ("disk_mgr_init: Erro ao iniciar o disco (DISK_CMD_DISKSIZE)\n");
+	//guarda o tamanho dos blocos do disco em blockSize
+	*blockSize = disk_cmd (DISK_CMD_BLOCKSIZE, 0, NULL);
+	if ((*blockSize) == -1){
+		perror("disk_mgr_init: Erro no block_size\n");
 		return -1;
 	}
-
-	*blockSize	=	disk_cmd (DISK_CMD_BLOCKSIZE, 0, NULL);
-	if (*blockSize == -1){
-		perror ("disk_mgr_init: Erro ao iniciar o disco (DISK_CMD_BLOCKSIZE)\n");
-		return -1;
-	}
-
-	task_create (&ddriver_task, (void *) disk_driver, NULL);
+	
+	task_create(&task_driver, diskDriverBody, NULL);
+	queue_remove ((queue_t **) &fila_tasks_prontas, (queue_t *) &task_driver);
 
 	return 0;
 }
 
-pedido_t* cria_pedido (int tipo, int block, void *buffer){
-	#ifdef DEBUGDISK
-	printf ("cria_pedido: entrou na função\n");
-	#endif
-
-	pedido_t* pedido = malloc (sizeof(pedido_t));
-
-	pedido->prev	= NULL;
-	pedido->next	= NULL;
-	pedido->tarefa	= current_task;
-	pedido->block	= block;
-	pedido->buffer	= buffer;
-	pedido->tipo 	= tipo;
-
-	return pedido;
-}
-
-int disk_block_read (int block, void *buffer){
-	#ifdef DEBUGDISK
+int disk_block_read  (int block, void* buffer){
+	#ifdef DEBUGPPOSDISK
 	printf ("disk_block_read: entrou na função\n");
 	#endif
 
 	sem_down(&sem_disk);
 
-	//agenda um pedido
-	pedido_t* pedido;
-	pedido = cria_pedido (READ, block, buffer);
+	pedido_t *pedido = malloc (sizeof(pedido_t));
 
-	if (pedido == NULL){
-		perror ("disk_block_read: erro no cria_pedido");
-		return -1;
-	}
+	pedido->block	= block;
+	pedido->buffer	= buffer; 
+	pedido->tipo	= READ;
+	pedido->task	= current_task;
 
-	if (queue_append ((queue_t **) &(sem_disk.fila_tasks), (queue_t *) pedido) < 0){
-		perror ("disk_block_read: erro no queue_append");
-		return -1;
-	}
+	queue_remove ((queue_t **) &fila_tasks_prontas, (queue_t *) current_task);
+	queue_append ((queue_t **) &pedidos_queue, (queue_t *) pedido);
+	queue_append ((queue_t **) &fila_tasks_prontas, (queue_t *) &task_driver);
 
-	if (ddriver_task.status == SUSPENSA){
-		task_resume (&ddriver_task, (task_t **) &fila_tasks_prontas);
-	}
+	#ifdef DEBUGPPOSDISK
+	printf ("disk_block_read: antes do yield\n");
+	#endif
 
 	sem_up(&sem_disk);
 
-	//task_yield();
+	task_yield();
 
-	task_suspend (&current_task);
+	#ifdef DEBUGPPOSDISK
+	printf ("disk_block_read: depois do yield\n");
+	#endif
+
+	free (pedido);
 
 	return 0;
 }
 
-int disk_block_write (int block, void *buffer){
-	#ifdef DEBUGDISK
+int disk_block_write (int block, void* buffer){
+	#ifdef DEBUGPPOSDISK
 	printf ("disk_block_write: entrou na função\n");
 	#endif
 
 	sem_down(&sem_disk);
 
-	//agenda um pedido
-	pedido_t* pedido;
-	pedido = cria_pedido (WRITE,block, buffer);
+	pedido_t *pedido = malloc (sizeof(pedido_t));
 
-	if (pedido == NULL){
-		perror ("disk_block_write: erro no cria_pedido");
-		return -1;
-	}
+	pedido->block	= block;
+	pedido->buffer	= buffer;
+	pedido->tipo	= WRITE;
+	pedido->task	= current_task;
 
-	if (queue_append ((queue_t **) &(sem_disk.fila_tasks), (queue_t *) pedido) < 0){
-		perror ("disk_block_write: erro no queue_append");
-		return -1;
-	}
+	queue_remove ((queue_t **) &fila_tasks_prontas, (queue_t *) current_task);
+	queue_append ((queue_t **) &pedidos_queue, (queue_t *) pedido);
+	queue_append ((queue_t **) &fila_tasks_prontas, (queue_t *) &task_driver);
 
-	if (ddriver_task.status == SUSPENSA){
-		task_resume (&ddriver_task, (task_t **) &fila_tasks_prontas);
-	}
+	#ifdef DEBUGPPOSDISK
+	printf ("disk_block_write: antes do yield\n");
+	#endif
 
 	sem_up(&sem_disk);
 
-	//task_yield();
+	task_yield();
 
-	task_suspend (&current_task);
-	
+	#ifdef DEBUGPPOSDISK
+	printf ("disk_block_write: depois do yield\n");
+	#endif
+
+	free (pedido);
+
 	return 0;
 }
-

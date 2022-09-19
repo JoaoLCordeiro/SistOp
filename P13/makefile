@@ -8,7 +8,7 @@ disco1: $(OBJS1)
 	gcc -o pingpong-disco1 $(CFLAGS) $(OBJS1) -lrt
 
 disco2: $(OBJS2)
-	gcc -o pingpong-disco1 $(CFLAGS) $(OBJS2) -lrt
+	gcc -o pingpong-disco2 $(CFLAGS) $(OBJS2) -lrt
 
 pingpong-disco1.o: pingpong-disco1.c
 	gcc $(CFLAGS) -c pingpong-disco1.c

@@ -19,27 +19,28 @@
 //  // completar com os campos necessarios
 //} disk_t ;
 
+//#define DEBUGPPOSDISK
+
 #define 	READ	1
 #define		WRITE	2
 
-//estrutura de um pedido
 typedef struct pedido_t{
-	task_t *prev, *next;//usado na fila de pedidos
-	task_t *tarefa;		//tarefa que fez o pedido
-	int		tipo;		//se é escrita ou leitura
-	int		block;		//bloco interessado
-	void   *buffer;		//buffer do pedido
+	struct pedido_t	*prev, *next;
+	int		block;
+	void*	buffer;
+	int		tipo;
+	task_t*	task;
 } pedido_t;
 
-semaphore_t sem_disk;	//semáforo do disco
+semaphore_t sem_disk;
 
-struct sigaction disk_action;	//ação do disco pra quando receber sinal
+pedido_t* pedidos_queue;
 
-int sinal_disk;			//sinal do disco
+task_t task_driver;
 
-task_t ddriver_task;	//task do driver
+int sinal_disco;
 
-queue_t* pedidos_prontos;
+struct sigaction action_disk;
 
 // inicializacao do gerente de disco
 // retorna -1 em erro ou 0 em sucesso
